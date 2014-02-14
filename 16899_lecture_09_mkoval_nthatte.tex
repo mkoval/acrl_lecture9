@@ -6,6 +6,23 @@
 \usepackage{epsfig}
 \usepackage[tight]{subfigure}
 
+% TD
+%   online policy evaluation
+%   learning rate (intuition and bounds)
+% SARSA
+%   define the loss function
+%   derive the full gradient 
+%   drop the extra term
+%   explain that this is NOT gradient descent
+%   mention the Bellman-Residual method
+% Q-Learning
+%   online fitted Q-iteration
+%   restate the parameter update
+%   exploration policies: epsilon-greedy and Boltzman
+% Off-Policy vs On-Policy learning
+% Experience Replay
+
+
 %extra packages added
 %\usepackage{algorithm}
 %\usepackage{algorithmic}
@@ -93,8 +110,10 @@ In the last few lectures we have covered methods such as FVI, FQI, and FPI, whic
 
 First we will cover the easiest one, the TD method, which is the online analogy of FPI.  Then we will look at methods such as SARSA and Q-learning, which are both online analogies of FQI.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \section{TD}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TODO: Explain that Eqn. 2.1 is policy evaluation, not TD.
 TD is policy evaluation. Given $\pi$, estimate $V_\pi(s), \forall s$:
 \begin{equation}
 	V_\pi(s) = R(s,\pi(s)) + \gamma E_{s'}[V_\pi(s')]
@@ -124,6 +143,12 @@ Let's look at the Udpate rule in step \ref{step.updateTD} a little more closely.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection*{TD Update for Tabular Case}
+% TODO: Start with 2.3
+% TODO: Also add the {i} and {i + 1} indices.
+% TODO: Derive the full gradient; drop the necessary term.
+% TODO: Discuss annealing of alpha and the convergence properties.
+% TODO: Explain what \alpha is.
+% TODO: Replace V with \tilde{V}^\pi.
 Given $V, s, r, s'$, update $V(s)$ (the value in our table).  We use $\alpha$ as a proportiality factor, and we approximate the new value as a proportion of the old value summed with a proportion of the value as estimated from Eq. (\ref{eq.valueTD}).  From Eq. (\ref{eq.valueTD}), we approximate $E_{s'}[V_\pi(s')]$ with $V(s')$.  And so we get:
 \begin{equation}
 	V_\pi(s) \leftarrow (1-\alpha)V(s) + \alpha(r+\gamma V(s')), \alpha \in [0,1]
