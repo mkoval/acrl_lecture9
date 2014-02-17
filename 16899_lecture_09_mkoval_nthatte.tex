@@ -6,6 +6,7 @@
 \usepackage{cleveref}
 \usepackage{epsfig}
 \usepackage[tight]{subfigure}
+\usepackage{comment}
 
 % TD (Nitish)
 %   online policy evaluation
@@ -127,41 +128,41 @@ When performing policy evaluation we would like,
 where samples $s_t$ are drawn from the transition function following policy $\pi$. Given an estimate of the value function $\tilde{V}^\pi(s)$ we would like to perform an update in order to minimize the loss
 \begin{equation}
 	\mathcal{L} = \frac{1}{2} \left(V^\pi(s) - \tilde{V}^\pi(s) \right)^2.
-	\label{eq.valUpdate}
+	\label{eq.valLoss}
 \end{equation}
 
-Since we do not yet know the value function, evaluating this loss requires evaluation equation~\ref{eq.policyEval}. Therefore, this method requires waiting until the end of an episode before updating $\tilde{V}^\pi(s)$. To perform this algorithm update online given training tuples $(s,r,s')$, we can instead estimate $V^\pi(s)$ as $y = r + \gamma \tilde{V}^\pi(s')$. Plugging this estimate into the loss function we get
+Since we do not yet know the value function, evaluating this loss requires evaluation equation~\ref{eq.policyEval}. Therefore, this method requires waiting until the end of an episode before updating $\tilde{V}^\pi(s)$. To perform this update online given training tuples $(s,r,s')$, we can instead estimate $V^\pi(s)$ as $y = r + \gamma \tilde{V}^\pi(s')$. Plugging this estimate into the loss function we get
 \begin{equation}
 	\mathcal{L} = \frac{1}{2} \left(y - \tilde{V}^\pi(s) \right)^2.
-	\label{eq.valUpdateApprox}
+	\label{eq.valLossApprox}
 \end{equation}
 
 Differentiating this loss gives
 \begin{equation}
     \nabla_{\tilde{V}^\pi}\mathcal{L} = \left(y - \tilde{V}^\pi(s) \right) \left(\nabla_{\tilde{V}^\pi} y - 1 \right)
-    \label{eq:valGrad}
+    \label{eq.valGrad}
 \end{equation}
 It is not possible to get unbiased estimates of both $\tilde{V}_\pi(s)$ and $y$ with only one $(s,r,s')$ tuple. To avoid this issue, the TD method ignores the $\nabla_{\tilde{V}^\pi} y$ term yielding the following update rule:
 \begin{align}
     \tilde{V}^\pi(s) &\leftarrow  \tilde{V}^\pi - \alpha \nabla_{\tilde{V}^\pi}\mathcal{L} \notag \\
     \tilde{V}^\pi(s) &\leftarrow  \tilde{V}^\pi + \alpha \left(r + \gamma \tilde{V}^\pi(s') - \tilde{V}^\pi(s) \right) \notag \\
-    \tilde{V}_\pi(s) &\leftarrow  (1 - \alpha) \tilde{V}^\pi(s) + \alpha \left(r+ \gamma \tilde{V}^\pi(s') \right). 
-    \label{eq:val(s)Grad}
+    \tilde{V}^\pi(s) &\leftarrow  (1 - \alpha) \tilde{V}^\pi(s) + \alpha \left(r+ \gamma \tilde{V}^\pi(s') \right). 
+    \label{eq.valUpdate}
 \end{align}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection*{Algorithm TD:}
 
 \begin{enumerate}
-	\item Initialize $V$
-	\item $\forall s$, repeat until $V$ converges
+	\item Initialize $\tilde{V}^\pi$
+	\item $\forall s$, repeat until $\tilde{V}^\pi(s)$ converges
 	\begin{enumerate}
 		\item Initialize $s$
 		\item Repeat until $s$ is terminal (This is a trajectory from a particular intitial starting state.)
 		\begin{enumerate}
 			\item Do $\pi(s)$
 			\item Observe $s', r$
-			\item Update ($V, s, r, s'$)
+			\item Update $\tilde{V}^\pi(s)$ given  $(s, r, s')$
 			\label{step.updateTD}
 			\item $s \leftarrow s'$
 		\end{enumerate}		
@@ -187,7 +188,7 @@ We start by initializing all states to 0:
 	\label{fig.fig2}
 \end{figure}
 
-As the robot moves one cell over from the start state (yellow arrow above), the reward is $0$, and the value of both the current state and the next state is $0$, so $\delta$ evaluates to $0$.  (See Eq. \ref{eq.delta}).  As the robot moves into the goal state (red arrow), the reward is $1$, so $\delta$ evaluates to $1$.  We then update the second-to-last cell with Eq. (\ref{eq.updateTDShort}) and we get:
+As the robot moves one cell over from the start state (yellow arrow above), the reward is $0$, and the value of both the current state and the next state is $0$, so the gradient used in the update rule (\cref{eq.valUpdate}) evaluates to $0$ and no update is performed. As the robot moves into the goal state (red arrow), the reward is $1$, so the gradient evaluates to $1$.  We then update the second-to-last cell with \cref{eq.valUpdate} and we get:
 
 \begin{figure}[h!]
 	\centering
@@ -205,124 +206,33 @@ Another iteration of the algorithm gives us:
 	\label{fig.fig4}
 \end{figure}
 
-This method is slow, because we have to run the whole policy just to update the next cell.  Instead, when we update a cell, we could iterate all the way backwards, tracing back to the start location, updating values as we go.  This is the idea behind eligibility traces, as disucssed below.
-
+This method is slow, because we have to run the whole policy just to update the next cell.  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Eligibility Traces}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Let $e(s)$ be out elibility trace, which is a proportional elibility factor.
-Then our update becomes:
-\begin{equation}
-	V(s") \leftarrow + \alpha \delta e(s"), \forall s"
-\end{equation}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{Algorithm TD($\lambda$):}
-\begin{enumerate}
-	\item Initialize $V$
-	\item $\forall s$, repeat until $V$ converges
-	\begin{enumerate}
-		\item Initialize $s$
-		\item $\forall s', e(s') = 0$
-		\item Repeat until $s$ is terminal
-		\begin{enumerate}
-			\item Do $\pi(s)$
-			\item Observe $s', r$
-			\item $e(s) \leftarrow e(s) + 1$
-			\label{step.elig}
-			\item $\delta \leftarrow (r+\gamma V(s') - V(s))$
-			\item $\forall$ states $s"$
-			\label{step.forall}
-			\begin{enumerate}
-				\item $V(s") \leftarrow V(s") + \alpha \delta e(s")$
-				\item $e(s") \leftarrow \lambda \gamma e(s")$
-				\label{step.elig2}
-			\end{enumerate}	
-		\end{enumerate}		
-	\end{enumerate}		
-\end{enumerate}		
-Note that if $\lambda = 0$, we just get the regular TD algorithm.
-
-Using the same grid cell world example, we start by initializing the values and the eligibility of each state to $0$. (Values shown in black, eligibility shown in red.)
-
-\begin{figure}[h!]
-	\centering
-	\includegraphics[width=.4\columnwidth]{./images/fig5}
-	%\caption{}
-	\label{fig.fig5}
-\end{figure}
-
-Updating the elgibility of the first cell with step \ref{step.elig}, we get:
-
-\begin{figure}[h!]
-	\centering
-	\includegraphics[width=.4\columnwidth]{./images/fig6}
-	%\caption{}
-	\label{fig.fig6}
-\end{figure}
-
-Below, the second cell has been updated with step \ref{step.elig}, and the first cell has been updated with step \ref{step.elig2}:
-\clearpage
-\begin{figure}[h]
-	\centering
-	\includegraphics[width=.4\columnwidth]{./images/fig7}
-	%\caption{}
-	\label{fig.fig7}
-\end{figure}
-
-This is after updating both the first and second cell again with step \ref{step.elig2}:
-\begin{figure}[h!]
-	\centering
-	\includegraphics[width=.4\columnwidth]{./images/fig8}
-	%\caption{}
-	\label{fig.fig8}
-\end{figure}
-
-After completing all cells, we get:
-\begin{figure}[h!]
-	\centering
-	\includegraphics[width=.4\columnwidth]{./images/figFinal}
-	%\caption{}
-	\label{fig.figFinal}
-\end{figure}
-
-Note that as $\lambda \rightarrow 0$, the values will get smaller and smaller as we go further back to the start.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{TD($\lambda$) Update with Function Approximator}
-In the parametric case, we change a couple steps in the TD($\lambda$) algorithm above.
-
-Step \ref{step.elig} becomes
-\begin{equation}
-	e \leftarrow \lambda \gamma e + \bigtriangledown_\theta V_\theta(s)
-\end{equation}
-
-Step \ref{step.forall} becomes
-\begin{equation}
-	\theta \leftarrow \theta + \alpha \delta e,
-\end{equation}
-where
-\begin{equation}
-	e = \sum_{s"} e(s") \bigtriangledown_\theta V(s") 
-\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{SARSA}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-In SARSA, we find our optimal policy $\pi^*$ by learning $Q^*$.  If we have an exact model, we can use the equation:
+SARSA extends the Temporal Differencing method presented in the previous section to evaluate policies using state-action functions $Q^\pi(s,a)$. Similar to the TD case, we wish to evaluate a policy by performing an online update to obtain an estimate, $\tilde{Q}^\pi(s,a)$, of the true state-action function $Q^\pi(s,a)$, which satisfies:
 \begin{equation}
-	Q^*(s,a) = R(s,a) + \gamma E_{p(s'|s,a)}[\max_{a'} Q^*(s',a')]
-	\label{eq.sarsa}
+	Q^\pi(s,a) = r(s,a) + \sum_{t = 1}^\infty \gamma^t E[r(s_t,\pi(s_t))]
+	\label{eq.sarsaEval}
 \end{equation}
-When we don't have an exact model, we estimate $Q^*$, which is what we'll do here.
 
-With TD, we were operating on transitions between states.
+As in TD, we seek to minimize the loss
+\begin{equation}
+	\mathcal{L} = \frac{1}{2} \left(y - \tilde{Q}^\pi(s,a) \right)^2
+	\label{eq.sarsaLoss}
+\end{equation}
+where $y = r(s,a) + \gamma \tilde{Q}^\pi(s',\pi(s'))$. Following a similar derivation as used for the TD update, we arive at the SARSA update rule:
 
-With SARSA, we are operating on transitions between state, action pairs.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{equation}
+    \tilde{Q}^\pi(s,a) \leftarrow  (1 - \alpha) \tilde{Q}^\pi(s,a) + \alpha \left(r(s,a) + \gamma \tilde{Q}^\pi(s',\pi(s')) \right). 
+	\label{eq.sarsaUpdate}
+\end{equation}
 \subsection*{Algorithm SARSA:}
 \begin{enumerate}
-	\item Initialize $Q$
-	\item Repeat until $Q$ converges
+	\item Initialize $Q^\pi$
+	\item Repeat until $Q^\pi$ converges
 	\begin{enumerate}
 		\item Initialize $s$, $a \sim \hat{\pi}_{Q(s)}$
 
@@ -332,7 +242,7 @@ With SARSA, we are operating on transitions between state, action pairs.
 			\item Do $a$
 			\item Observe $s'$, $r$
 			\item Pick $a' \sim \hat{\pi}_{Q(s')}$
-			\item Update ($Q, s, a, r, s', a'$)
+			\item Update $Q^\pi(s,a)$ given $(s, a, r, s', a')$
 			
 			(This is where SARSA comes from!)
 			\item $s \leftarrow s'$, $a \leftarrow a'$ 
@@ -360,24 +270,9 @@ There are two ways that $\hat{\pi}_Q$ can be defined:
 \end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{SARSA Update for Tabular Case}
-Eq. (\ref{eq.sarsa}) is the exact value of $Q$, if we have a model.  We approximate $Q$ with:
-\begin{equation}
-	Q(s,a) \leftarrow (1 - \alpha) Q(s,a) + \alpha(r + \gamma Q(s',a'))
-	\label{eq.sarsaApprox}
-\end{equation}
-We can rewrite this as:
-\begin{equation}
-	Q(s,a) = Q(s,a) + \alpha(r + \gamma Q(s',a') - Q(s,a))
-\end{equation}
-let $\delta = (r + \gamma Q(s',a') - Q(s,a))$, so then we can write:
-\begin{equation}
-	Q(s,a) = Q(s,a) + \alpha \delta
-	\label{eq.sarsaUpdateTab}
-\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{comment}
 \subsection*{SARSA Update with Function Approximator}
-For the parametric case, we change Eq. (\ref{eq.sarsaUpdateTab}) to:
+For the parametric case, we change Eq. (\ref{eq.sarsaUpdate}) to:
 \begin{equation}
 	\theta \leftarrow \theta + \alpha \delta \bigtriangledown_\theta Q_\theta(s,a)
 \end{equation}
@@ -405,6 +300,7 @@ For example, if $Q_\theta(s,a) = \theta^T f(s,a)$, then $\bigtriangledown_\theta
 		\end{enumerate}
 	\end{enumerate}
 \end{enumerate}
+\end{comment}
 
 % Q-Learning (Mike)
 %   online fitted Q-iteration
