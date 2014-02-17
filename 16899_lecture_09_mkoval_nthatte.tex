@@ -3,6 +3,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsthm}
+\usepackage{cleveref}
 \usepackage{epsfig}
 \usepackage[tight]{subfigure}
 
@@ -28,6 +29,8 @@
 %\usepackage{algorithmic}
 \numberwithin{equation}{section}
 \numberwithin{figure}{section}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\uniform}{uniform}
 
 \newcommand{\handout}[5]{
   \noindent
@@ -441,12 +444,119 @@ For example, if $Q_\theta(s,a) = \theta^T f(s,a)$, then $\bigtriangledown_\theta
 	\end{enumerate}
 \end{enumerate}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Q-learning}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-The only difference from SARSA is how we do the update.  Again, Eq. (\ref{eq.sarsa}) is the exact value of $Q$, if we have a model.  In SARSA, we approximated this with Eq. (\ref{eq.sarsaApprox}).  Now we approximate with:
-\begin{equation}
-	Q(s,a) \leftarrow (1 - \alpha) Q(s,a) + \alpha(r + \gamma \max_{a'}Q(s',a'))
-\end{equation}
-The only difference from Eq. (\ref{eq.sarsaApprox}) is the $\max$ term.  This allows us to pick actions without worrying about the policy distribution.
+% Q-Learning (Mike)
+%   online fitted Q-iteration
+%   restate the parameter update
+%   exploration policies: epsilon-greedy and Boltzman
+\section{Q-Learning}
+Q-Learning attempts to learn the optimal action-value function\footnote{This is
+sometimes written as $Q^*(s, a)$.} $Q(s, a)$ from an online stream of
+experiences. Suppose we receive experience $(s, a, r, s')$ with the approximate
+action-value function $\tilde{Q}(s, a)$. Performing a Bellman backup would
+update the action-value function
+\begin{align*}
+    \tilde{Q}(s, a) \gets r + \gamma \max_{a' \in A} \tilde{Q}(s', a').
+\end{align*}
+
+However, just as in SARSA, this performs poorly when the transition or reward
+functions are stochastic. Instead, we update $\tilde{Q}^*$ to the weighted sum
+\begin{align*}
+    \tilde{Q}(s, a) \gets \alpha \left[r + \gamma \max_{a' \in A} \tilde{Q}(s', a')\right]
+                          + (1 - \alpha) \tilde{Q}(s, a)
+\end{align*}
+where $0 \le \alpha \le 1$ is the \emph{learning rate} parameter.
+
+\subsection{Fitted Q-Learning}
+Just as the fitted Q-iteration algorithm, we can use a function approximator to
+approximate the action-value function. Suppose that we approximate $Q$ with the
+the function $\tilde{Q}^\theta$ with hyperparameter $\theta$. Instead of
+directly updating our action-value function, we now must update $\theta$ to
+achieve the desired change in $\tilde{Q}^\theta$.
+
+To fit $\theta$, we minimize a loss function
+\begin{align*}
+    \mathcal{L} &= \frac{1}{2} \left( y - Q^\theta(s, a) \right)^2
+\end{align*}
+that penalizes deviation between the approximate action-value function
+$Q^\theta(s, a)$ and the value $y = r + \gamma \max_{a' \in A} Q^\theta(s',
+a')$ predicted by a Bellman backup. We will now find the optimal parameter
+$\theta$ by performing gradient descent on $\mathcal{L}$ with the update rule
+\begin{align}
+    \theta &\gets (1 - \alpha) \theta + \alpha \nabla_\theta \mathcal{L}
+    \label{eqn:qlearning-step}
+\end{align}
+
+First, we must derive the gradient of $\mathcal{L}$. By applying the chain
+rule, we find
+\begin{align*}
+    \nabla_\theta \mathcal{L} &= \left(y - Q^\theta(s, a)\right) \left[
+                                      \nabla_\theta y
+                                    - \nabla_\theta Q^\theta(s, a) \right] \\
+                              &= \left(y - Q^\theta(s, a)\right) \left[
+                                      \gamma \nabla_\theta Q^\theta(s, a^*)
+                                    - \nabla_\theta Q^\theta(s, a) \right]
+\end{align*}
+where $a^* = \argmax_{a \in A} Q^\theta(s, a)$ is the optimal action according
+to $Q^\theta$. Unfortunately, it is not possible to obtain an unbiased estimate
+of $Q^\theta(s, a) Q^\theta(s, a^*)$ using one sample $(s, a, r, s')$. Instead,
+Q-learning assumes that $y$ is constant and approximates the gradient as
+\begin{align}
+    \nabla_\theta \mathcal{L}_\text{approx} &= -\left(y - Q^\theta(s, a)\right)
+                                       \nabla_\theta Q^\theta(s, a).
+    \label{eqn:qlearning-gradient}
+\end{align}
+
+The complete fitted Q-learning update rule is found by substituting
+\cref{eqn:qlearning-gradient} into \cref{eqn:qlearning-step}:
+\begin{align*}
+    \theta &\gets (1 - \alpha) \theta - \alpha \left[
+                y - Q^\theta(s, a)\right] \nabla Q^\theta (s, a) \\
+           &\gets (1 - \alpha) \theta - \alpha \left[
+                \left( r - \gamma Q^\theta(s, a^*) \right)
+                - Q^\theta(s, a)\right] \nabla Q^\theta (s, a).
+\end{align*}
+
+\subsection{Bellman Residual Method}
+Q-learning as described above does not implement gradient descent and, thus, is
+not guaranteed to converge to a local minimum. The \emph{Bellman residual
+algorithm} method avoids the approximation of \cref{eqn:qlearning-gradient} by
+estimating the true gradient $\nabla_\theta \mathcal{L}$. This estimation is
+only unbiased if we can generate two independent successor states for taking
+action $a$ in state $s$.
+
+Generating these samples is trivial if we are able to simulate the system; i.e.
+have access to a known or learned transition model. If we do not know the
+transition model, then it is only possible to perform a Bellman residual update
+if we postpone a backup until the same state-action pair has been observed two
+or more times. This is often impossible when applying Q-learning to a real system
+that has a continuous state-action space.
+
+% TODO: Cite: http://www.leemon.com/papers/1995b.pdf
+
+\subsection{Exploration Policies}
+Unlike SARSA, which is an \emph{on-policy} method,  Q-learning is an
+\emph{off-policy} method that can learn from arbitrary $(s, a, r, s')$
+experiences, regardless of what policy was used to generate them. This means
+that it is possible to use an \emph{exploration policy} training that
+encourages the agent to visit previously unexplored regions of the state-action
+space.
+
+Two exploration policies that are commonly used with Q-learning are:
+\begin{enumerate}
+    \item \textbf{$\epsilon$-Greedy}. Choose the greedy action $a = \argmax_{a
+        \in A} Q(s, a)$ with probability $1 - \epsilon$. Otherwise, with probability
+        $\epsilon$, choose an action uniformly at random $a \sim \uniform(A)$. Higher
+        values of $\epsilon$ encourage more exploration.
+    \item \textbf{Boltzmann Exploration.} Choose action $a$ with probability
+        \begin{align*}
+            p(a) \propto \frac{\exp\left[ \beta Q(s, a) \right]}
+                              {\sum_{a' \in A} \exp\left[ \beta Q(s, a') \right]},
+        \end{align*}
+        which is weighted towards selecting actions with higher $Q$-values. Lower
+        values of $\beta$ encourage more exploration.
+\end{enumerate}
+
+\subsection{Experience Replay}
+% TODO
+
 \end{document}
