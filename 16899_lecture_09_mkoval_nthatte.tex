@@ -118,11 +118,36 @@ First we will present the Temporal Differencing method for online updates in the
 \section{Temporal Differencing (TD)}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TODO: Explain that Eqn. 2.1 is policy evaluation, not TD.
-Equation~\ref{eq.policyEval} is 
+
+When performing policy evaluation we would like,
 \begin{equation}
-	V_\pi(s) = R(s,\pi(s)) + \gamma E_{s'}[V_\pi(s')]
+	V^\pi(s) = \sum_{t = 0}^\infty \gamma^t E[r(s_t,\pi(s_t))]
 	\label{eq.policyEval}
 \end{equation}
+where samples $s_t$ are drawn from the transition function following policy $\pi$. Given an estimate of the value function $\tilde{V}^\pi(s)$ we would like to perform an update in order to minimize the loss
+\begin{equation}
+	\mathcal{L} = \frac{1}{2} \left(V^\pi(s) - \tilde{V}^\pi(s) \right)^2.
+	\label{eq.valUpdate}
+\end{equation}
+
+Since we do not yet know the value function, evaluating this loss requires evaluation equation~\ref{eq.policyEval}. Therefore, this method requires waiting until the end of an episode before updating $\tilde{V}^\pi(s)$. To perform this algorithm update online given training tuples $(s,r,s')$, we can instead estimate $V^\pi(s)$ as $y = r + \gamma \tilde{V}^\pi(s')$. Plugging this estimate into the loss function we get
+\begin{equation}
+	\mathcal{L} = \frac{1}{2} \left(y - \tilde{V}^\pi(s) \right)^2.
+	\label{eq.valUpdateApprox}
+\end{equation}
+
+Differentiating this loss gives
+\begin{equation}
+    \nabla_{\tilde{V}^\pi}\mathcal{L} = \left(y - \tilde{V}^\pi(s) \right) \left(\nabla_{\tilde{V}^\pi} y - 1 \right)
+    \label{eq:valGrad}
+\end{equation}
+It is not possible to get unbiased estimates of both $\tilde{V}_\pi(s)$ and $y$ with only one $(s,r,s')$ tuple. To avoid this issue, the TD method ignores the $\nabla_{\tilde{V}^\pi} y$ term yielding the following update rule:
+\begin{align}
+    \tilde{V}^\pi(s) &\leftarrow  \tilde{V}^\pi - \alpha \nabla_{\tilde{V}^\pi}\mathcal{L} \notag \\
+    \tilde{V}^\pi(s) &\leftarrow  \tilde{V}^\pi + \alpha \left(r + \gamma \tilde{V}^\pi(s') - \tilde{V}^\pi(s) \right) \notag \\
+    \tilde{V}_\pi(s) &\leftarrow  (1 - \alpha) \tilde{V}^\pi(s) + \alpha \left(r+ \gamma \tilde{V}^\pi(s') \right). 
+    \label{eq:val(s)Grad}
+\end{align}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection*{Algorithm TD:}
@@ -142,69 +167,6 @@ Equation~\ref{eq.policyEval} is
 		\end{enumerate}		
 	\end{enumerate}		
 \end{enumerate}		
-
-Let's look at the Udpate rule in step \ref{step.updateTD} a little more closely.  We can look at both the tabular cases, and when we have a function approximator.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{TD Update for Tabular Case}
-% TODO: Start with 2.3
-% TODO: Also add the {i} and {i + 1} indices.
-% TODO: Derive the full gradient; drop the necessary term.
-% TODO: Discuss annealing of alpha and the convergence properties.
-% TODO: Explain what \alpha is.
-% TODO: Replace V with \tilde{V}^\pi.
-Given $V, s, r, s'$, update $V(s)$ (the value in our table).  We use $\alpha$ as a proportiality factor, and we approximate the new value as a proportion of the old value summed with a proportion of the value as estimated from Eq. (\ref{eq.valueTD}).  From Eq. (\ref{eq.valueTD}), we approximate $E_{s'}[V_\pi(s')]$ with $V(s')$.  And so we get:
-\begin{equation}
-	V_\pi(s) \leftarrow (1-\alpha)V(s) + \alpha(r+\gamma V(s')), \alpha \in [0,1]
-	\label{eq.updateTD}
-\end{equation}
-We can define the loss as:
-\begin{equation}
-	L = \frac{1}{2}(V_\pi(s)-V(s))^2
-\end{equation}
-We want our update rule to move in the negative direction of the gradient of the loss:
-\begin{equation}
-	V(s) \leftarrow V(s) - \alpha \frac{\partial L}{\partial V(s)}
-\end{equation}
-The gradient is:
-\begin{equation}
-	\frac{\partial L}{\partial V(s)} = -(V_\pi(s) - V(s))
-	\label{eq.gradientLoss}
-\end{equation}
-We can get the value of this gradient by rearranging terms from Eq. (\ref{eq.updateTD}):
-\begin{equation}
-	-(V_\pi(s) - V(s)) = -(r + \gamma V(s') - V(s))
-\end{equation}
-And so finally our update rule is:
-\begin{equation}
-	V_\pi(s) \leftarrow V(s) + \alpha (r + \gamma V(s') - V(s))
-	\label{eq.updateTDFinal}
-\end{equation}
-For shorthand, let 
-\begin{equation}
-	\delta = (r + \gamma V(s') - V(s)),
-	\label{eq.delta}
-\end{equation}
-so we can re-write the update as:
-\begin{equation}
-	V_\pi(s) \leftarrow V(s) + \alpha \delta
-	\label{eq.updateTDShort}
-\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{TD Update with Function Approximator}
-Now let's look at the parametric case.  Let $\theta$ be the parameter, so we have $V_\theta(s)$.  For example, if we have a linear function, in might be:
-\begin{equation}
-	V_\theta(s) = \theta^TF(s)
-\end{equation}
-For the gradient of the loss, we must now use the chain rule, replacing Eq. (\ref{eq.gradientLoss}) with:
-\begin{equation}
-	\frac{\partial L}{\partial V(s)} = -(V_\pi(s) - V(s))\bigtriangledown_\theta V_\theta(s)
-\end{equation}
-Then our update becomes,
-\begin{equation}
-	\theta \leftarrow \theta + \alpha \delta \bigtriangledown_\theta V_\theta(s),
-\end{equation}
-with $\delta$ as defined in Eq. (\ref{eq.delta}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection*{Grid-based world example:}
