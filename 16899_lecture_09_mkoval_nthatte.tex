@@ -108,7 +108,7 @@ efficient use of available training data, but are computationally expensive and
 suffer from high memory consumption as the number of experiences increases. In
 this lecture, we present several online techniques that perform well even when
 presented with large amounts of data. Online methods perform an incremental
-update after state transition, as shown below:
+update after each state transition, as shown below: 
 
 \begin{figure}[h!]
 	\centering
@@ -119,11 +119,11 @@ update after state transition, as shown below:
 
 First, we will present the Temporal Differencing (TD) method for online policy
 evaluation. Next, we show how SARSA extends online policy evaluation to the
-action-value function. Finally, we explore Q-learning as an method of finding
+action-value function. Finally, we explore Q-learning as a method of finding
 the optimal policy.
 
 \section{Temporal Differencing (TD)}
-Temporal differencing, or TD-learning, is an online method of estimating the
+Temporal differencing, or TD-learning, is an online method for estimating the
 value function
 \begin{equation}
 	V^\pi(s) = \sum_{t = 0}^\infty \gamma^t E\left[ r(s_t,\pi(s_t)) \right]
@@ -143,28 +143,29 @@ Since we do not yet know the value function, evaluating this loss requires
 evaluating equation~\ref{eq.policyEval}. Na\"{i}vely, this method would require
 waiting until the end of an episode before updating $\tilde{V}^\pi(s)$. Instead,
 we estimate $V^\pi(s)$ as $y = r + \gamma \tilde{V}^\pi(s')$ and perform an
-incremental update for each experience $(s, r, s')$,
+online update for each experience $(s, r, s')$,
 
 Plugging this estimate into the loss function we get
 \begin{equation}
-	\mathcal{L} = \frac{1}{2} \left(y - \tilde{V}^\pi(s) \right)^2.
+	\mathcal{L}_\text{approx} = \frac{1}{2} \left(y - \tilde{V}^\pi(s) \right)^2.
 	\label{eq.valLossApprox}
 \end{equation}
 
 The derivative of \cref{eq.valLossApprox} is:
 \begin{equation}
-    \nabla_{\tilde{V}^\pi}\mathcal{L} = \left(y - \tilde{V}^\pi(s) \right) \left(\nabla_{\tilde{V}^\pi} y - 1 \right).
+    \nabla_{\tilde{V}^\pi}\mathcal{L}_\text{approx} = \left(y - \tilde{V}^\pi(s) \right) \left(\nabla_{\tilde{V}^\pi} y - 1 \right).
     \label{eq.valGrad}
 \end{equation}
 
-It is, unfortunately, not possible to get unbiased estimates of both
-$\tilde{V}_\pi(s)$ and $y$ with only one $(s,r,s')$ tuple. To avoid this issue,
-the TD method ignores the $\nabla_{\tilde{V}^\pi} y$ and uses the following update
-rule:
+Unfortunately, it is not possible to get an unbiased estimate of
+$(\tilde{V}^\pi(s))(\nabla_{\tilde{V}^\pi}y)$ with only one
+$(s,r,s')$ tuple, as this requires unbiased estimates of both
+$\tilde{V}_\pi(s)$ and $y$. To avoid this issue, the TD method ignores the
+$\nabla_{\tilde{V}^\pi} y$ term and uses the following update rule:
 \begin{align}
-    \tilde{V}^\pi(s) &\leftarrow  \tilde{V}^\pi - \alpha \nabla_{\tilde{V}^\pi}\mathcal{L} \notag \\
-                     &\leftarrow  \tilde{V}^\pi + \alpha \left(r + \gamma \tilde{V}^\pi(s') - \tilde{V}^\pi(s) \right) \notag \\
-                     &\leftarrow  (1 - \alpha) \tilde{V}^\pi(s) + \alpha \left(r+ \gamma \tilde{V}^\pi(s') \right). 
+    \tilde{V}^\pi(s) &\gets \tilde{V}^\pi(s) - \alpha \nabla_{\tilde{V}^\pi}\mathcal{L}_\text{approx} \notag \\
+                     &\gets \tilde{V}^\pi(s) + \alpha \left(r + \gamma \tilde{V}^\pi(s') - \tilde{V}^\pi(s) \right) \notag \\
+                     &\gets (1 - \alpha) \tilde{V}^\pi(s) + \alpha \left(r+ \gamma \tilde{V}^\pi(s') \right). 
     \label{eq.valUpdate}
 \end{align}
 
@@ -177,7 +178,7 @@ rule:
 		\item Repeat until $s$ is terminal (This is a trajectory from a particular intitial starting state.)
 		\begin{enumerate}
 			\item Do $\pi(s)$
-			\item Observe $s', r$
+			\item Observe $r, \ s'$
 			\item Update $\tilde{V}^\pi(s)$ given  $(s, r, s')$
 			\label{step.updateTD}
 			\item $s \leftarrow s'$
@@ -194,7 +195,7 @@ The diagram below shows a grid-based world, where the robot starts in the upper 
 	\label{fig.fig1}
 \end{figure}
 
-We start by initializing all states to 0:
+We start by initializing $\tilde{V}^\pi(s) = 0,\ \forall s$.
 
 \begin{figure}[h!]
 	\centering
@@ -203,7 +204,7 @@ We start by initializing all states to 0:
 	\label{fig.fig2}
 \end{figure}
 
-As the robot moves one cell over from the start state (yellow arrow above), the reward is $0$, and the value of both the current state and the next state is $0$, so the gradient used in the update rule (\cref{eq.valUpdate}) evaluates to $0$ and no update is performed. As the robot moves into the goal state (red arrow), the reward is $1$, so the gradient evaluates to $1$.  We then update the second-to-last cell with \cref{eq.valUpdate} and we get:
+As the robot moves one cell over from the start state (yellow arrow above), the reward is $0$, and the value of both the current state and the next state is $0$, so the approximate gradient used in the update rule (\cref{eq.valUpdate}) evaluates to $0$ and no update is performed. As the robot moves into the goal state (red arrow), the reward is $1$, so the approximate gradient evaluates to $1$.  We then update the second-to-last cell with \cref{eq.valUpdate} and we get:
 
 \begin{figure}[h!]
 	\centering
@@ -216,7 +217,7 @@ Another iteration of the algorithm gives us:
 
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=.4\columnwidth]{./images/fig4}
+	\includegraphics[width=.4\columnwidth]{./images/fig4new}
 	%\caption{}
 	\label{fig.fig4}
 \end{figure}
@@ -238,11 +239,11 @@ true state-action function $Q^\pi(s,a)$:
 
 As in TD, we seek to minimize the loss
 \begin{equation}
-	\mathcal{L} = \frac{1}{2} \left(y - \tilde{Q}^\pi(s,a) \right)^2
+	\mathcal{L}_\text{approx} = \frac{1}{2} \left(y - \tilde{Q}^\pi(s,a) \right)^2
 	\label{eq.sarsaLoss}
 \end{equation}
 where $y = r(s,a) + \gamma \tilde{Q}^\pi(s',\pi(s'))$. Following a similar
-derivation as used for the TD update, we arive at the SARSA update rule:
+derivation as used for the TD update, we arrive at the SARSA update rule:
 \begin{equation}
     \tilde{Q}^\pi(s,a) \leftarrow  (1 - \alpha) \tilde{Q}^\pi(s,a)
         + \alpha \left[ r(s,a) + \gamma \tilde{Q}^\pi(s',\pi(s')) \right].
@@ -253,14 +254,12 @@ derivation as used for the TD update, we arive at the SARSA update rule:
 	\item Initialize $Q^\pi$
 	\item Repeat until $Q^\pi$ converges
 	\begin{enumerate}
-		\item Initialize $s$, $a \sim \hat{\pi}_{Q(s)}$
-
-		(This means we initialize the action randomly according to some distribution $\hat{\pi}_{Q(s)}$.)
+		\item Initialize $s$, $a = \pi(s)$
 		\item Repeat until $s$ is terminal
 		\begin{enumerate}
 			\item Do $a$
 			\item Observe $s'$, $r$
-			\item Pick $a' \sim \hat{\pi}_{Q(s')}$
+			\item Pick $a' = \pi(s')$
 			\item Update $Q^\pi(s,a)$ given $(s, a, r, s', a')$
 			
 			(This is where SARSA comes from!)
@@ -286,7 +285,7 @@ functions are stochastic. Instead, we update $\tilde{Q}^*$ to the weighted sum
 \end{align*}
 where $0 \le \alpha \le 1$ is the \emph{learning rate} parameter.
 
-Q-learning is guaranteed to converge $\tilde{Q}^*$ to the optimal action-ovalue
+Q-learning is guaranteed to converge $\tilde{Q}^*$ to the optimal action-value
 function $Q^*$ as $t \to \infty$ given that the following conditions hold:
 \begin{enumerate}
     \item Each state-action pair is visited infinite times
@@ -300,7 +299,7 @@ experience.
 
 \subsection{Fitted Q-Learning}
 Just as the fitted Q-iteration algorithm, we can use a function approximator to
-approximate the action-value function. Suppose that we approximate $Q$ with the
+approximate the action-value function. Suppose that we approximate $Q$ with 
 the function $\tilde{Q}^\theta$ with hyperparameter $\theta$. Instead of
 directly updating our action-value function, we now must update $\theta$ to
 achieve the desired change in $\tilde{Q}^\theta$.
@@ -314,7 +313,7 @@ $Q^\theta(s, a)$ and the value $y = r + \gamma \max_{a' \in A} Q^\theta(s',
 a')$ predicted by a Bellman backup. We will now find the optimal parameter
 $\theta$ by performing gradient descent on $\mathcal{L}$ with the update rule
 \begin{align}
-    \theta &\gets (1 - \alpha) \theta + \alpha \nabla_\theta \mathcal{L}
+    \theta &\gets \theta - \alpha \nabla_\theta \mathcal{L}
     \label{eqn:qlearning-step}
 \end{align}
 
@@ -325,12 +324,12 @@ rule, we find
                                       \nabla_\theta y
                                     - \nabla_\theta Q^\theta(s, a) \right] \\
                               &= \left(y - Q^\theta(s, a)\right) \left[
-                                      \gamma \nabla_\theta Q^\theta(s, a^*)
+                                      \gamma \nabla_\theta Q^\theta(s', a^*)
                                     - \nabla_\theta Q^\theta(s, a) \right]
 \end{align*}
-where $a^* = \argmax_{a \in A} Q^\theta(s, a)$ is the optimal action according
+where $a^* = \argmax_{a' \in A} Q^\theta(s', a')$ is the optimal action according
 to $Q^\theta$. Unfortunately, it is not possible to obtain an unbiased estimate
-of $Q^\theta(s, a) Q^\theta(s, a^*)$ using one sample $(s, a, r, s')$. Instead,
+of $Q^\theta(s, a) Q^\theta(s', a^*)$ using one sample $(s, a, r, s')$. Instead,
 Q-learning assumes that $y$ is constant and approximates the gradient as
 \begin{align}
     \nabla_\theta \mathcal{L}_\text{approx} &= -\left(y - Q^\theta(s, a)\right)
@@ -341,10 +340,10 @@ Q-learning assumes that $y$ is constant and approximates the gradient as
 The complete fitted Q-learning update rule is found by substituting
 \cref{eqn:qlearning-gradient} into \cref{eqn:qlearning-step}:
 \begin{align*}
-    \theta &\gets (1 - \alpha) \theta - \alpha \left[
-                y - Q^\theta(s, a)\right] \nabla Q^\theta (s, a) \\
-           &\gets (1 - \alpha) \theta - \alpha \left[
-                \left( r - \gamma Q^\theta(s, a^*) \right)
+    \theta &\gets \theta + \alpha \left[y - Q^\theta(s, a)\right] 
+                \nabla Q^\theta (s, a) \\
+           &\gets \theta + \alpha \left[
+                \left( r - \gamma Q^\theta(s', a^*) \right)
                 - Q^\theta(s, a)\right] \nabla Q^\theta (s, a).
 \end{align*}
 
@@ -397,8 +396,8 @@ means that the agent must observe each transition $(s, a, s')$ many times to
 propagate the reward backwards in time.
 
 \emph{Experience replay} allows online algorithms to re-use experience multiple
-times by buiding a database $D$ of experiences.  Once enough data has been
+times by building a database $D$ of experiences.  Once enough data has been
 collected, the agent performs a fixed number of Q-learning or SARSA updates on
-the batch. This technique bridges the gap--and can potentially combine the
-advantages of---offline and online algorithms.
+the batch. This technique bridges the gap between and can potentially combine the
+advantages of offline and online algorithms.
 \end{document}
