@@ -307,22 +307,33 @@ For example, if $Q_\theta(s,a) = \theta^T f(s,a)$, then $\bigtriangledown_\theta
 %   restate the parameter update
 %   exploration policies: epsilon-greedy and Boltzman
 \section{Q-Learning}
-Q-Learning attempts to learn the optimal action-value function\footnote{This is
-sometimes written as $Q^*(s, a)$.} $Q(s, a)$ from an online stream of
-experiences. Suppose we receive experience $(s, a, r, s')$ with the approximate
-action-value function $\tilde{Q}(s, a)$. Performing a Bellman backup would
-update the action-value function
+Q-Learning attempts to learn the optimal action-value function $Q(s, a)$ from
+an online stream of experiences. Suppose we receive experience $(s, a, r, s')$
+with the approximate action-value function $\tilde{Q}(s, a)$. Performing a
+Bellman backup would update the action-value function
 \begin{align*}
-    \tilde{Q}(s, a) \gets r + \gamma \max_{a' \in A} \tilde{Q}(s', a').
+    \tilde{Q}^*(s, a) \gets r + \gamma \max_{a' \in A} \tilde{Q}^*(s', a').
 \end{align*}
 
 However, just as in SARSA, this performs poorly when the transition or reward
 functions are stochastic. Instead, we update $\tilde{Q}^*$ to the weighted sum
 \begin{align*}
-    \tilde{Q}(s, a) \gets \alpha \left[r + \gamma \max_{a' \in A} \tilde{Q}(s', a')\right]
-                          + (1 - \alpha) \tilde{Q}(s, a)
+    \tilde{Q}^*(s, a) \gets \alpha \left[r + \gamma \max_{a' \in A} \tilde{Q}^*(s', a')\right]
+                            + (1 - \alpha) \tilde{Q}^*(s, a)
 \end{align*}
 where $0 \le \alpha \le 1$ is the \emph{learning rate} parameter.
+
+Q-learning is guaranteed to converge $\tilde{Q}^*$ to the optimal action-ovalue
+function $Q^*$ as $t \to \infty$ given that the following conditions hold:
+\begin{enumerate}
+    \item Each state-action pair is visited infinite times
+    \item $\lim_{t \to \infty} \sum_{t = 0}^\infty \alpha_t = \infty$
+    \item $\lim_{t \to \infty} \sum_{t = 0}^\infty \alpha_t^2 < \infty$.
+\end{enumerate}
+The latter two conditions mean that the learning rate $\alpha$ must be annealed
+over time. Intuitively, this means that the agent begins by quickly updating
+$\tilde{Q}^*$, then slows down to refine its estimate as it receives more
+experience.
 
 \subsection{Fitted Q-Learning}
 Just as the fitted Q-iteration algorithm, we can use a function approximator to
@@ -397,7 +408,9 @@ Unlike SARSA, which is an \emph{on-policy} method,  Q-learning is an
 experiences, regardless of what policy was used to generate them. This means
 that it is possible to use an \emph{exploration policy} training that
 encourages the agent to visit previously unexplored regions of the state-action
-space.
+space. Exploration policies guarantee that the agent visites each state an
+infinite number and insures convergence in domains where an exact update is
+possible.
 
 Two exploration policies that are commonly used with Q-learning are:
 \begin{enumerate}
@@ -407,14 +420,22 @@ Two exploration policies that are commonly used with Q-learning are:
         values of $\epsilon$ encourage more exploration.
     \item \textbf{Boltzmann Exploration.} Choose action $a$ with probability
         \begin{align*}
-            p(a) \propto \frac{\exp\left[ \beta Q(s, a) \right]}
-                              {\sum_{a' \in A} \exp\left[ \beta Q(s, a') \right]},
+            p(a) = \frac{\exp\left[ \beta Q(s, a) \right]}
+                        {\sum_{a' \in A} \exp\left[ \beta Q(s, a') \right]},
         \end{align*}
         which is weighted towards selecting actions with higher $Q$-values. Lower
         values of $\beta$ encourage more exploration.
 \end{enumerate}
 
-\subsection{Experience Replay}
-% TODO
+\section{Experience Replay}
+Q-learning and SARSA are both computationally efficient, but make inefficient
+use of data. Unlike batch methods, each sample is only used exactly once. This
+means that the agent must observe each transition $(s, a, s')$ many times to
+propagate the reward backwards in time.
 
+\emph{Experience replay} allows online algorithms to re-use experience multiple
+times by buiding a database $D$ of experiences.  Once enough data has been
+collected, the agent performs a fixed number of Q-learning or SARSA updates on
+the batch. This technique bridges the gap--and can potentially combine the
+advantages of---offline and online algorithms.
 \end{document}
